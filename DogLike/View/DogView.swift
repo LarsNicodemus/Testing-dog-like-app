@@ -14,7 +14,8 @@ struct DogView: View {
     @State var likeAnimationTrigger: Bool = false
     @State var dislikeAnimationTrigger: Bool = false
     @State var breednameTr: Bool = false
-
+    @GestureState private var scale = 1.0
+    @State private var currentOffset = CGSize.zero
 
     var body: some View {
         VStack {
@@ -45,6 +46,78 @@ struct DogView: View {
 
             if let dogImageURL = dogVM.dogImageURL {
                 AnimatedAsyncImage(url: dogImageURL)
+                    .offset(x: currentOffset.width)
+                    .rotationEffect(.degrees(currentOffset.width / 15))
+                    .opacity(1.0 - Double(abs(currentOffset.width / 250)))
+                    .onTapGesture {
+                        print(dogImageURL)
+                    }
+                    .onLongPressGesture(minimumDuration: 1.5) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            likeAnimationTrigger = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            likeAnimationTrigger = false
+                        }
+                        dogVM.likeAction()
+                        milestoneCounter += 1
+                    }
+                    .scaleEffect(scale)
+                    .gesture(
+                        MagnifyGesture()
+                            .updating($scale)
+                            { value, gestureState, transaction in
+                                gestureState = value.magnification
+                            }
+                    )
+                    .gesture(
+                        DragGesture()
+                            .onChanged{ gesture in
+                                currentOffset = gesture.translation
+                            }
+                            .onEnded { _ in
+                                if currentOffset.width > 50 {
+                                    withAnimation(.easeOut) {
+                                        currentOffset.width = 200
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        withAnimation {
+                                            currentOffset = .zero
+                                        }
+                                    }
+                                    dogVM.likeAction()
+                                    milestoneCounter += 1
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        likeAnimationTrigger = true
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        likeAnimationTrigger = false
+                                    }
+                                } else if currentOffset.width < -50 {
+                                    withAnimation(.easeOut) {
+                                        currentOffset.width = -200
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        withAnimation {
+                                            currentOffset = .zero
+                                        }
+                                    }
+                                    dogVM.dislikeAction()
+                                    milestoneCounter += 1
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        dislikeAnimationTrigger = true
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        dislikeAnimationTrigger = false
+                                    }
+                                } else {
+                                    withAnimation {
+                                        currentOffset = .zero
+                                    }
+                                }
+                            }
+                    )
+
             } else {
                 ProgressView()
             }
@@ -137,6 +210,7 @@ struct DogView: View {
 
 struct AnimatedAsyncImage: View {
     let url: URL?
+ 
     
     @State private var scale: CGFloat = 0.1
     
@@ -153,6 +227,7 @@ struct AnimatedAsyncImage: View {
                 .onAppear {
                     scale = 1.0
                 }
+                
         } placeholder: {
             ProgressView()
         }
